@@ -10,6 +10,10 @@ that serves the course is the next-best option.
 
 Configuration (all via env vars or the .env file next to this script):
     OLLAMA_UPSTREAM   — URL of the upstream Ollama API. Default: http://localhost:11434
+    LISTEN_HOST       — interface to bind on.             Default: 127.0.0.1 (loopback only)
+                        Set to 0.0.0.0 if you genuinely need LAN access; this also
+                        exposes /chat-config keys to anyone on the network, so use
+                        with care.
     LISTEN_PORT       — port this proxy listens on.       Default: 8767
     GEMINI_API_KEY    — surfaced to the widget via /chat-config
     ANTHROPIC_API_KEY — surfaced to the widget via /chat-config
@@ -61,6 +65,7 @@ def _load_dotenv(path: pathlib.Path) -> None:
 
 _load_dotenv(pathlib.Path(__file__).resolve().parent / ".env")
 
+LISTEN_HOST = os.environ.get("LISTEN_HOST", "127.0.0.1")   # loopback by default
 LISTEN_PORT = int(os.environ.get("LISTEN_PORT", "8767"))
 UPSTREAM    = os.environ.get("OLLAMA_UPSTREAM", "http://localhost:11434")
 TIMEOUT     = 600  # seconds — long, because model generation can be slow
@@ -193,8 +198,11 @@ class ThreadingServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
 
 def main():
-    server = ThreadingServer(("0.0.0.0", LISTEN_PORT), ProxyHandler)
-    print(f"[proxy] listening on :{LISTEN_PORT}  ->  {UPSTREAM}")
+    server = ThreadingServer((LISTEN_HOST, LISTEN_PORT), ProxyHandler)
+    bind = "all interfaces (0.0.0.0)" if LISTEN_HOST == "0.0.0.0" else LISTEN_HOST
+    print(f"[proxy] listening on {bind}:{LISTEN_PORT}  ->  {UPSTREAM}")
+    if LISTEN_HOST == "0.0.0.0":
+        print(f"[proxy] WARNING: binding to 0.0.0.0 exposes /chat-config (API keys) to anyone on the LAN")
     print(f"[proxy] from the browser, point chat host to:  http://localhost:{LISTEN_PORT}")
     detected = [k for k, ev in ENV_KEY_MAP.items() if os.environ.get(ev)]
     if detected:
