@@ -1,0 +1,59 @@
+{
+  "name": "acolyte",
+  "version": "0.1.0",
+  "description": "A drop-in web chat widget that reads the page with you. Page-aware RAG, multi-provider LLMs (Anthropic / OpenAI / Ollama / OpenAI-compatible proxies), voice in + out, persona system, cached + persistent. One-liner install. Works in plain HTML, React, Svelte, Vue.",
+  "keywords": [
+    "chat",
+    "widget",
+    "rag",
+    "llm",
+    "ollama",
+    "anthropic",
+    "openai",
+    "tts",
+    "voice",
+    "tutor",
+    "in-browser",
+    "indexeddb"
+  ],
+  "license": "MIT",
+  "author": "Gyasi Sutton",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./style.css": "./dist/styles.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.0",
+    "typescript": "^5.5.0",
+    "@types/dompurify": "^3.0.5"
+  },
+  "dependencies": {
+    "marked": "^14.0.0",
+    "dompurify": "^3.1.0",
+    "katex": "^0.16.11"
+  },
+  "browser": {
+    "fs": false,
+    "path": false
+  }
+}

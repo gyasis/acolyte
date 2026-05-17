@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+.env
+.env.local
+.env.production
+config.local.js
+*.tsbuildinfo
+.cache/
+# server/ holds an optional Python proxy with its own .env
+server/.env
+server/__pycache__/
+server/*.pyc

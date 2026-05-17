@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acolyte — plug-and-play demo</title>
+  <style>
+    body {
+      max-width: 720px; margin: 40px auto; padding: 0 20px;
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.7; color: #222;
+    }
+    h1 { font-size: 32px; margin-bottom: 8px; }
+    h2 { margin-top: 36px; font-size: 22px; }
+    code {
+      background: #f0eee8; padding: 2px 6px; border-radius: 4px;
+      font-family: ui-monospace, monospace; font-size: 0.92em;
+    }
+    .meta { color: #888; font-size: 13px; margin-bottom: 28px; }
+    .install { background: #fafaf6; border-left: 3px solid #2D8B55;
+               padding: 16px 20px; margin: 24px 0; font-size: 14px; }
+    .install code { background: #eee; }
+  </style>
+</head>
+<body>
+  <article>
+    <h1>The DSPy framework, in 60 seconds</h1>
+    <div class="meta">A test page demonstrating the acolyte chat widget — multi-section so RAG has something to chew on.</div>
+
+    <div class="install">
+      <strong>The widget loads with zero JS on this page.</strong>
+      All config lives in <code>acolyte.config.json</code> alongside this
+      HTML. Edit that file; refresh; you're done. See the <code>&lt;script&gt;</code>
+      tag at the bottom — that's the whole integration.
+    </div>
+
+    <h2>What it is</h2>
+    <p>
+      DSPy (Declarative Self-improving Python) is a Stanford framework for
+      <em>programming</em> language models instead of <em>prompting</em> them.
+      You declare a <strong>Signature</strong> (inputs → outputs), wrap it
+      in a <strong>Module</strong> (<code>Predict</code>,
+      <code>ChainOfThought</code>, <code>ReAct</code>), and let an
+      <strong>Optimizer</strong> tune the prompt for you against a metric.
+    </p>
+
+    <h2>Why it matters</h2>
+    <p>
+      Raw f-string prompts age badly. Modules are swappable. Optimizers
+      like <code>MIPROv2</code> and <code>GEPA</code> replace hand-tuning
+      with measurable improvement loops.
+    </p>
+
+    <h2>Three primitives to know</h2>
+    <p>
+      <strong>Signature</strong> declares the contract — what fields go in,
+      what fields come out, plus a one-line description. The model never
+      sees it directly; the adapter renders it into provider-specific
+      messages. <strong>Module</strong> wraps the signature with a calling
+      strategy: <code>Predict</code> is a single LLM call,
+      <code>ChainOfThought</code> prepends a hidden reasoning field,
+      <code>ReAct</code> loops the model with tool calls until done.
+      <strong>Optimizer</strong> takes a module + a metric + labeled
+      examples and produces a tuned version with better prompts and demos.
+    </p>
+
+    <h2>Try the chat</h2>
+    <p>
+      Click the chat button bottom-right, or press <kbd>Ctrl+K</kbd>.
+      The widget can see this page as context. Ask it something the page
+      hints at but does not fully explain — for instance:
+      <em>"What's the difference between BootstrapFewShot and MIPROv2?"</em>
+      or <em>"How does ChainOfThought differ from ReAct, mechanically?"</em>
+    </p>
+  </article>
+
+  <!-- ─────────────────────────────────────────────────────────────────
+       The entire integration is this ONE script tag.
+       Config lives in the external acolyte.config.json file — edit
+       that, not this HTML. Three other loading patterns are documented
+       in docs/config.md (data-attributes inline, window.AcolyteConfig,
+       manual mount() call from your own JS).
+       ───────────────────────────────────────────────────────────────── -->
+  <script type="module" src="../../dist/index.js" data-config="acolyte.config.json"></script>
+</body>
+</html>

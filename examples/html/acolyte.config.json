@@ -1,0 +1,35 @@
+{
+  "_comment": "Acolyte widget config — edit this file, not the HTML. Loaded by the script tag's data-config attribute.",
+
+  "llm": {
+    "provider": "ollama",
+    "host": "http://localhost:8767",
+    "_model_hint": "leave model unset to auto-pick the first available from /api/tags"
+  },
+
+  "persona": "teacher",
+
+  "rag": {
+    "auto": true,
+    "topK": 5
+  },
+
+  "ui": {
+    "accent": "#2D8B55",
+    "position": "right",
+    "keyboardShortcut": "mod+k"
+  },
+
+  "voice": {
+    "enabled": true,
+    "accent": "en-GB",
+    "gender": "male"
+  },
+
+  "storage": {
+    "dbName": "acolyte-example",
+    "cacheEnabled": true,
+    "historyEnabled": true,
+    "memoryEnabled": true
+  }
+}
