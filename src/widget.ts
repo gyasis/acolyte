@@ -1219,6 +1219,32 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
       ...state.history
     ];
 
+    // Response-cache lookup. Key = (provider, model, lastUserMsg, system).
+    // The system prompt encodes persona + RAG passages + module context,
+    // so any of those changing busts the cache automatically. We never
+    // cache responses that came back with tool_calls — those depend on
+    // dynamic tool results.
+    const cacheOn = cfg.storage?.cacheEnabled !== false;
+    const provider = cfg.llm.provider;
+    const modelName = (cfg.llm as any).model ?? '';
+    if (cacheOn) {
+      try {
+        const hit = await db.cacheGet(provider, modelName, convo, system);
+        if (hit) {
+          thinking.remove();
+          await db.cacheBumpHit(hit.hash);
+          const bubble = appendMsg('assistant', hit.response);
+          updateAssistantRaw(bubble, hit.response);
+          appendSourcesFooter(bubble, state.lastRagHits);
+          maybeAutoSpeak(bubble);
+          state.history.push({ role: 'assistant', content: hit.response });
+          await persistAndRefresh(q, hit.response);
+          state.busy = false;
+          return;
+        }
+      } catch { /* cache miss / db error — fall through to network */ }
+    }
+
     try {
       let bubble: HTMLElement | null = null;
       const onDelta = (_d: string, full: string) => {
@@ -1246,9 +1272,29 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
           const tcBlock = appendToolCall(fn.name, fn.arguments, { label: 'native' });
           let result = '';
           let errored = false;
-          try { result = await tools.run(fn.name, fn.arguments); }
-          catch (e: any) { result = `Tool error: ${e.message}`; errored = true; }
-          tcBlock.finish(result, errored);
+          let fromCache = false;
+          // Tool-result cache lookup. Keyed by (toolName, sha(args)).
+          // Lets repeat calls (same research topic, same lookup) skip
+          // the round-trip and the spend.
+          if (cacheOn) {
+            try {
+              const tHit = await db.toolCacheGet(fn.name, fn.arguments);
+              if (tHit) {
+                result = tHit.response;
+                fromCache = true;
+                await db.toolCacheBumpHit(fn.name, fn.arguments);
+              }
+            } catch { /* fall through to live tool call */ }
+          }
+          if (!fromCache) {
+            try { result = await tools.run(fn.name, fn.arguments); }
+            catch (e: any) { result = `Tool error: ${e.message}`; errored = true; }
+            if (cacheOn && !errored) {
+              try { await db.toolCachePut(fn.name, fn.arguments, result); }
+              catch { /* cache write failure should not break the flow */ }
+            }
+          }
+          tcBlock.finish(result, errored, fromCache);
           state.history.push({
             role: 'tool',
             content: result,
@@ -1285,6 +1331,13 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
         appendSourcesFooter(finalBubble, state.lastRagHits);
         maybeAutoSpeak(finalBubble);
         state.history.push({ role: 'assistant', content: res.text });
+        // Cache the response on the non-tool-call path. Tool-call paths
+        // are deliberately skipped because their final answer depends on
+        // tool results that are themselves dynamic.
+        if (cacheOn && res.text) {
+          try { await db.cachePut(provider, modelName, convo, res.text, system); }
+          catch { /* non-fatal */ }
+        }
         await persistAndRefresh(q, res.text);
       }
     } catch (e: any) {
