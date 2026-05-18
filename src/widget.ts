@@ -9,11 +9,11 @@
  *   - Tools via Tools
  *   - Persona-driven system prompt
  *
- * The full UI parity with the SIO/dspy-course version (history panel,
- * recent strip, drill-down tool blocks, sources footer, voice picker UI,
- * resize handle, keyboard shortcuts) is on the roadmap; this file
- * delivers a working MVP that supports the core ask-page-respond loop
- * with all the underlying engines wired up.
+ * Full UI parity (history panel, recent-chats strip, drill-down tool
+ * blocks, sources footer, voice picker UI, resize handle, keyboard
+ * shortcuts) is delivered alongside the core ask-page-respond loop;
+ * each piece is wired into the underlying engines (LLM, RAG, TTS, DB,
+ * tools, plugins) listed above.
  */
 
 import type {
