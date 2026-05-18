@@ -41,12 +41,11 @@ test page.
 - Framework wrappers (`@acolyte/react`, `@acolyte/vue`, `@acolyte/svelte`)
 
 **What lives in test pages, not in acolyte:**
-- The SIO dspy-course at `~/Documents/code/SIO/dspy-course/` is a sample
-  page used to verify the widget works end-to-end. It currently embeds
-  an OLDER copy of the chat code in its own `chat/` folder. That older
-  copy will be replaced by an `import { mount } from 'acolyte'` call
-  pointing at this package's `dist/` output. Acolyte's repo must not
-  reference SIO; SIO is a downstream consumer.
+- Test/demo pages (whether shipped under `examples/` or maintained as a
+  separate consuming project) verify the widget end-to-end against a
+  real page. They consume acolyte via `import { mount } from 'acolyte'`
+  pointing at the package's `dist/` output. Acolyte's repo must not
+  name any specific downstream consumer.
 
 ---
 
@@ -103,9 +102,9 @@ test page.
 │   └── README.md                         ← how to run it
 └── dist/                                 ← built; gitignored
 
-~/Documents/code/SIO/dspy-course/        ← TEST PAGE (separate project)
-└── Old embedded chat. To migrate, replace its <script> tags with the
-   acolyte one-line loader pointing at acolyte/dist/index.js.
+<any-consuming-project>/                  ← TEST/DEMO PAGE (separate project)
+└── Replaces any embedded chat code with a one-line loader pointing
+   at acolyte's `dist/index.js` (or an npm install of the package).
 ```
 
 ---

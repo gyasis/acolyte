@@ -55,11 +55,11 @@ This is why:
 - **Not a backend service.** The widget runs entirely in the browser.
   An optional Python CORS proxy ships in `cors-proxy.py`, but it is a
   shim — never a runtime requirement of the widget itself.
-- **Not coupled to any specific consuming project.** The SIO course at
-  `~/Documents/code/SIO/dspy-course/` is a *test page* that demonstrates
-  the widget in a real page; it is NOT the project. Acolyte's repo does
-  not reference SIO, and SIO must not embed acolyte's source files
-  directly — it should consume acolyte's built `dist/` only.
+- **Not coupled to any specific consuming project.** Acolyte ships with
+  example pages under `examples/`; those are demos, not the project.
+  Consuming projects must import the built `dist/` output (e.g.
+  `import { mount } from 'acolyte'`) and never reference acolyte's
+  source files directly. The repo carries no cross-project paths.
 - **Not tied to any one LLM provider.** Provider adapters live behind
   a uniform interface. Adding a new provider (Cohere, Mistral, custom
   WebSocket) is a plugin.

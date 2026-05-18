@@ -64,12 +64,14 @@ unrelated page that is NOT acolyte's own.
 ### Two-command bring-up
 
 ```bash
-# Terminal 1: serve the test page
-cd ~/Documents/code/SIO/dspy-course
+# Terminal 1: serve a test page that consumes the widget. Either the
+# bundled examples/html page or a separate consuming project:
+cd examples/html                         # or your own consuming project
 python3 -m http.server 8766 --bind 127.0.0.1
 
-# Terminal 2: serve the Ollama proxy (only needed if Ollama is remote)
-cd ~/Documents/code/acolyte/server      # or cp .env from dspy-course
+# Terminal 2: serve the Ollama proxy (only needed if Ollama is remote
+# or if you want /chat-config to surface API keys to the widget)
+cd ../../server                          # back to acolyte/server
 python3 cors-proxy.py
 
 # open the page
