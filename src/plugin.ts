@@ -23,6 +23,9 @@ import type { ToolDescriptor } from './tools/index.js';
 /* ───── Hook payload shapes ───── */
 
 export interface SendContext {
+  /** Stable per-conversation identifier (created at mount). Read-only.
+   *  Lets a plugin tag outbound events so a backend can group a session. */
+  sessionId: string;
   /** The full message array about to go to the LLM. Mutable. */
   messages: { role: 'system' | 'user' | 'assistant' | 'tool'; content: string }[];
   /** The user's just-sent question (last user message). Read-only. */
@@ -35,6 +38,8 @@ export interface SendContext {
 }
 
 export interface ResponseContext {
+  /** Stable per-conversation identifier (matches the SendContext). */
+  sessionId: string;
   question: string;
   responseText: string;
   /** Wall-clock ms from send to response. */

@@ -27,6 +27,29 @@
 }
 .acolyte-panel.open { display: flex; }
 
+/* ───── Optional branded topbar (see UIConfig.topbar) ─────
+   Renders above .acolyte-header when configured. The visibility class
+   on the element controls when it shows; default is mobile-only. */
+.acolyte-topbar {
+  display: flex;
+  align-items: center;
+  padding: max(14px, env(safe-area-inset-top)) 18px 12px;
+  background: #fbf3e5;
+  border-bottom: 1px solid #e3d3b9;
+  font: 600 12px/1 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--acolyte-accent, #a8623a);
+  flex-shrink: 0;
+  white-space: pre;
+}
+.acolyte-topbar--mobile { display: none; }
+.acolyte-topbar--always { display: flex; }
+.acolyte-topbar--never { display: none; }
+@media (max-width: 640px) {
+  .acolyte-topbar--mobile { display: flex; }
+}
+
 .acolyte-header {
   display: flex; align-items: center; gap: 8px;
   padding: 14px 16px; border-bottom: 1px solid #e5e5e5;

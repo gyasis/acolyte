@@ -165,6 +165,28 @@ export interface UIConfig {
   defaultWidth?: 'narrow' | 'wide' | 'full';
   /** Whether to inject the bundled stylesheet at mount time. Default true. */
   autoInjectCss?: boolean;
+  /**
+   * Optional branded topbar rendered above Acolyte's own header inside the
+   * chat panel. Useful for full-screen / mobile contexts where the visitor
+   * loses sight of the host site's chrome. Configurable per deployment.
+   *
+   * Visibility:
+   *   - 'mobile' (default) → only shows when the panel goes fullscreen
+   *     (≤640px viewport). Desktop side-panel keeps the existing header
+   *     because the host topbar is still visible behind it.
+   *   - 'always' → render at all viewport widths.
+   *   - 'never' → off entirely (same as omitting the topbar field).
+   *
+   * `html` takes precedence over `label` when both are set. Use `html`
+   * for a logo SVG + custom layout; use `label` for a quick text strip.
+   */
+  topbar?: {
+    label?: string;        // e.g. '● TwiceData · Assistant'
+    html?: string;         // raw HTML — overrides label
+    visibility?: 'mobile' | 'always' | 'never';
+    bg?: string;           // background color CSS value
+    color?: string;        // text color CSS value
+  };
 }
 
 /* ───── Voice ───── */

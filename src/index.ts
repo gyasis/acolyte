@@ -271,6 +271,14 @@ export type {
 } from './plugin.js';
 import { crossPageRAG } from './plugins/crossPageRAG.js';
 export { crossPageRAG };
+import { agentAssist } from './plugins/agentAssist.js';
+export { agentAssist };
+export type { AgentAssistConfig } from './plugins/agentAssist.js';
+import { semanticRAG } from './plugins/semanticRAG.js';
+export { semanticRAG };
+export type { SemanticRAGConfig } from './plugins/semanticRAG.js';
 
 // Register built-in plugins for JSON/YAML name-based plugin loading.
 BUILT_IN_PLUGINS.crossPageRAG = crossPageRAG;
+BUILT_IN_PLUGINS.agentAssist = agentAssist;
+BUILT_IN_PLUGINS.semanticRAG = semanticRAG;

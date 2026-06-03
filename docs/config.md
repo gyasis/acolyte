@@ -113,6 +113,86 @@ If you want the script loaded but no auto-mount (e.g. you'll call
 </script>
 ```
 
+## Branded topbar (`ui.topbar`)
+
+Acolyte's chat panel ships with its own internal header (model picker,
+settings gear, history, close). On desktop the visitor still sees the
+host site's chrome behind the narrow side panel — but on mobile the
+panel goes fullscreen, and the visitor loses every visual cue that
+they're still on your site. `ui.topbar` solves that by rendering an
+optional brand strip *above* Acolyte's header inside the panel.
+
+### Minimum config
+
+```jsonc
+{
+  "ui": {
+    "topbar": {
+      "label": "● Brand  ·  Assistant",
+      "visibility": "mobile",
+      "bg": "#fbf3e5",
+      "color": "#a8623a"
+    }
+  }
+}
+```
+
+| Field | Type | What it does |
+|---|---|---|
+| `label` | string | Text rendered in the strip. Use a unicode bullet, em-dash, etc. for visual flourish. Ignored if `html` is set. |
+| `html` | string | Raw HTML — overrides `label`. Use for SVG logos, multi-color layouts, or any custom markup. Host supplies trusted markup; Acolyte does NOT sanitize. |
+| `visibility` | `'mobile'` &#124; `'always'` &#124; `'never'` | Default `'mobile'` — only renders at ≤640px viewport (fullscreen mode). `'always'` for sites that want the brand at every viewport. `'never'` is the same as omitting the field. |
+| `bg` | CSS color | Background color of the strip. Defaults to the same cream tone as Acolyte's header. |
+| `color` | CSS color | Text color. Defaults to `--acolyte-accent`. |
+
+### Where it renders
+
+The topbar is a real `<div class="acolyte-topbar acolyte-topbar--{visibility}">`
+inserted as the FIRST child of `.acolyte-panel`, before the resize
+handle and the existing Acolyte header. It participates in the panel's
+flex column layout. Safe-area-inset-top padding is built in, so it
+clears the iPhone notch automatically.
+
+The CSS classes — `.acolyte-topbar`, `.acolyte-topbar--mobile`,
+`.acolyte-topbar--always`, `.acolyte-topbar--never` — are stable
+selectors you can target from host CSS if you want to override the
+default styling without re-implementing the renderer.
+
+### Logo + multi-color layout (HTML form)
+
+For anything more than a one-color text strip, use `html`:
+
+```jsonc
+{
+  "ui": {
+    "topbar": {
+      "html": "<svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\"><circle cx=\"8\" cy=\"8\" r=\"5\" fill=\"#a8623a\"/></svg><span>Brand · Assistant</span>",
+      "visibility": "always",
+      "bg": "#fbf3e5"
+    }
+  }
+}
+```
+
+Wrap the contents in spans or use a flex layout via inline `style="..."`
+attributes; the parent `<div>` is `display: flex` so children align
+horizontally by default.
+
+### Why not just style `.acolyte-header` instead?
+
+Three reasons:
+
+1. **The Acolyte header is functional** — it carries the model picker,
+   gear, close button. Stuffing brand identity in there crowds the
+   functional controls.
+2. **Per-locale branding** — host sites with multiple language
+   deployments want different strings per locale. Driving the strip
+   from config is cleaner than maintaining a CSS override per locale.
+3. **Per-client deployment** — when Acolyte ships into multiple client
+   sites, each one has its own brand. Config-driven beats CSS-hack
+   beats fork-the-source. Topbar config keeps Acolyte as a generic
+   engine and pushes branding to the deployment layer.
+
 ## What the loader looks for
 
 On `DOMContentLoaded` (or immediately if the DOM is already loaded),

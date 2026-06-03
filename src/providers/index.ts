@@ -41,6 +41,11 @@ export interface SendOptions {
   temperature?: number;
   tools?: unknown[];                                  // OpenAI-style schema array
   onDelta?: (delta: string, full: string) => void;
+  /** Opaque per-conversation identifier. Forwarded as the OpenAI `user`
+   *  body field so a same-origin proxy can correlate the request with a
+   *  conversation (analytics, abuse tracking, operator hand-off, etc.).
+   *  Ignored by providers that don't accept it. */
+  user?: string;
 }
 
 export interface SendResult {
@@ -198,6 +203,7 @@ async function openaiSend(
   };
   if (cfg.maxTokens) body.max_tokens = cfg.maxTokens;
   if (opts.tools)    body.tools = opts.tools;
+  if (opts.user)     body.user = opts.user;
 
   const r = await fetch(`${base}/chat/completions`, {
     method: 'POST', headers, body: JSON.stringify(body)
