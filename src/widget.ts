@@ -745,11 +745,26 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
     bubble.appendChild(wrap);
   }
 
+  /** Ask the host app to handle navigation (SPA-style) before falling back to
+   *  a hard page load. Dispatches a cancelable `acolyte:navigate` event; if a
+   *  host listener calls preventDefault() it has taken over the navigation
+   *  (e.g. SvelteKit goto / React Router / Vue router) and the widget — mounted
+   *  outside the host's routed view — survives the page change with its history
+   *  and any in-flight audio intact. With no host listener the event goes
+   *  un-prevented and we hard-navigate, so standalone Acolyte is unchanged. */
+  function requestHostNav(url: string): boolean {
+    const ev = new CustomEvent('acolyte:navigate', { detail: { url }, cancelable: true });
+    document.dispatchEvent(ev);
+    return ev.defaultPrevented;
+  }
+
   function jumpToSource(hit: { passage: any }): void {
     const url = hit.passage.pageUrl as string | undefined;
     // Cross-page hit → navigate to that page (carries the anchor, if any).
+    // Prefer a host SPA navigation so the widget (its panel, history, and
+    // playing audio) persists across pages; hard-load only if unhandled.
     if (url && !sameDoc(url)) {
-      window.location.href = url;
+      if (!requestHostNav(url)) window.location.href = url;
       return;
     }
     const sid = hit.passage.sectionId;
