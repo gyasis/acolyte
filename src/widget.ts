@@ -110,6 +110,13 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
     busy: false,
     history: [] as ChatMessage[],
     convId: null as number | null,
+    // Stable identifier for THIS conversation, generated once at mount.
+    // Forwarded to the LLM as the OpenAI `user` field and exposed to plugins
+    // via the send/response hook contexts, so a backend can correlate a
+    // chat session (analytics, lead capture, human hand-off, …).
+    sessionId: (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : 'sess-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10),
     historyPanelOpen: false,
     lastRagHits: [] as { score: number; passage: any }[],
     currentlySpeakingBtn: null as HTMLElement | null,
@@ -188,27 +195,52 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
 
   async function buildContextBlock(question: string): Promise<string> {
     const enabled = cfg.rag?.enabled !== false;
-    let hits: { score: number; passage: any }[] = enabled ? await rag.retrieve(question) : [];
+    const pageHits: { score: number; passage: any }[] = enabled ? await rag.retrieve(question) : [];
 
-    // Plugin-supplied RAG sources contribute additional passages — searched
-    // through the same BM25 path. Each plugin source is consulted; results
-    // are merged + re-ranked.
+    // Plugin-supplied RAG sources contribute additional passages. Two kinds:
+    //  • pre-scored (e.g. semantic search) — the source already ranked by its
+    //    own relevance (cosine); TRUST that score, don't re-rank lexically.
+    //  • lexical — re-rank the returned sections through BM25, as before.
     const sources = pluginHost.allRAGSources();
     const allowCross = cfg.rag?.crossPageReferences === true;
+    const lexHits: { score: number; passage: any }[] = [];
+    const semHits: { score: number; passage: any }[] = [];
     for (const src of sources) {
       if (src.crossPage && !allowCross) continue;   // gated by settings switch
       try {
         const sections = await src.fetch({ query: question });
         if (!sections.length) continue;
-        const tmpRag = new RAGEngine({ sections, topK: 5 });
-        const extra = await tmpRag.retrieve(question);
-        for (const h of extra) {
-          (h.passage as any).sourceName = src.name;
-          (h.passage as any).pageUrl = src.pageUrl?.(sections.find(s => s.id === (h.passage as any).sectionId)!);
+        const preScored = sections.every(s => typeof (s.meta as any)?.score === 'number');
+        if (preScored) {
+          for (const s of sections) {
+            semHits.push({
+              score: (s.meta as any).score as number,   // cosine, already ~[0,1]
+              passage: {
+                sectionId: s.id, sectionTitle: s.title, text: s.text,
+                sourceName: src.name, pageUrl: src.pageUrl?.(s)
+              }
+            });
+          }
+        } else {
+          const tmpRag = new RAGEngine({ sections, topK: 5 });
+          const extra = await tmpRag.retrieve(question);
+          for (const h of extra) {
+            (h.passage as any).sourceName = src.name;
+            (h.passage as any).pageUrl = src.pageUrl?.(sections.find(s => s.id === (h.passage as any).sectionId)!);
+          }
+          lexHits.push(...extra);
         }
-        hits = hits.concat(extra);
       } catch (e) { /* plugin source failed — skip */ }
     }
+    // Fuse channels with Reciprocal Rank Fusion — BM25 and cosine live on
+    // different (and non-comparable) scales, and naive max-normalisation
+    // inflates a weak lexical top-hit to 1.0, drowning real semantic matches.
+    // RRF is scale-free: each channel contributes 1/(K + rank). K=60 is the
+    // conventional constant.
+    const rrf = (arr: { score: number; passage: any }[], K = 60) =>
+      arr.slice().sort((a, b) => b.score - a.score)
+        .map((h, i) => ({ score: 1 / (K + i + 1), passage: h.passage }));
+    let hits = [...rrf(pageHits.concat(lexHits)), ...rrf(semHits)];
     hits.sort((a, b) => b.score - a.score);
     // Dedupe near-identical passages. The same section can show up multiple
     // times — once from the DOM scan of the host page, once from each
@@ -324,10 +356,32 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
       title: 'Drag to resize'
     });
 
-    panel = el('aside', { class: 'acolyte-panel', id: 'acolyte-panel' }, [
-      resizeHandle, header, settingsEl, historyPanelEl,
-      messagesBox, recentStripEl, inputRow
-    ]);
+    // Optional host-configured brand topbar (rendered above Acolyte's own
+    // header). Useful in full-screen / mobile contexts where the visitor
+    // loses the host site's chrome. Hidden by default; opt-in via
+    // cfg.ui.topbar.{label|html, visibility}.
+    const topbarCfg = cfg.ui?.topbar;
+    const topbarVis = topbarCfg?.visibility ?? 'mobile';
+    let topbarEl: HTMLElement | null = null;
+    if (topbarCfg && topbarVis !== 'never' && (topbarCfg.label || topbarCfg.html)) {
+      topbarEl = el('div', {
+        class: 'acolyte-topbar acolyte-topbar--' + topbarVis,
+        role: 'banner'
+      });
+      if (topbarCfg.html) {
+        // Raw HTML — host supplies trusted markup.
+        topbarEl.innerHTML = topbarCfg.html;
+      } else {
+        topbarEl.textContent = topbarCfg.label || '';
+      }
+      if (topbarCfg.bg) topbarEl.style.background = topbarCfg.bg;
+      if (topbarCfg.color) topbarEl.style.color = topbarCfg.color;
+    }
+
+    panel = el('aside', { class: 'acolyte-panel', id: 'acolyte-panel' },
+      [topbarEl, resizeHandle, header, settingsEl, historyPanelEl,
+       messagesBox, recentStripEl, inputRow].filter(Boolean) as HTMLElement[]
+    );
 
     // Hook up the drag-resize handle to let the user fine-tune width.
     wireResizeHandle(resizeHandle, panel);
@@ -691,11 +745,26 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
     bubble.appendChild(wrap);
   }
 
+  /** Ask the host app to handle navigation (SPA-style) before falling back to
+   *  a hard page load. Dispatches a cancelable `acolyte:navigate` event; if a
+   *  host listener calls preventDefault() it has taken over the navigation
+   *  (e.g. SvelteKit goto / React Router / Vue router) and the widget — mounted
+   *  outside the host's routed view — survives the page change with its history
+   *  and any in-flight audio intact. With no host listener the event goes
+   *  un-prevented and we hard-navigate, so standalone Acolyte is unchanged. */
+  function requestHostNav(url: string): boolean {
+    const ev = new CustomEvent('acolyte:navigate', { detail: { url }, cancelable: true });
+    document.dispatchEvent(ev);
+    return ev.defaultPrevented;
+  }
+
   function jumpToSource(hit: { passage: any }): void {
     const url = hit.passage.pageUrl as string | undefined;
     // Cross-page hit → navigate to that page (carries the anchor, if any).
+    // Prefer a host SPA navigation so the widget (its panel, history, and
+    // playing audio) persists across pages; hard-load only if unhandled.
     if (url && !sameDoc(url)) {
-      window.location.href = url;
+      if (!requestHostNav(url)) window.location.href = url;
       return;
     }
     const sid = hit.passage.sectionId;
@@ -1202,6 +1271,7 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
     state.history.push({ role: 'user', content: q });
 
     state.busy = true;
+    const startedAt = Date.now();
     // Visible "Thinking…" bubble. The animated dots in CSS make it clear
     // generation is in flight; the bubble is removed when the first
     // delta arrives (or replaced with the error message on failure).
@@ -1214,19 +1284,33 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
     // rag_passages / memory_recall blocks can inject them in their proper
     // place (instead of dangling at the end of the system prompt).
     const system = buildSystemPrompt(q, context, '');
-    const convo: ChatMessage[] = [
+    let convo: ChatMessage[] = [
       { role: 'system', content: system },
       ...state.history
     ];
+
+    const cacheOn = cfg.storage?.cacheEnabled !== false;
+    const provider = cfg.llm.provider;
+    const modelName = (cfg.llm as any).model ?? '';
+
+    // Plugin hook: let plugins observe / mutate the outgoing bundle before
+    // it is cached or sent (analytics, lead capture, operator hand-off, …).
+    {
+      const sendCtx = await pluginHost.runBeforeSend({
+        sessionId: state.sessionId,
+        messages: convo as any,
+        question: q,
+        llm: cfg.llm,
+        cacheKey: { provider, model: modelName, lastMessage: q, contextKey: '' }
+      });
+      convo = sendCtx.messages as any;
+    }
 
     // Response-cache lookup. Key = (provider, model, lastUserMsg, system).
     // The system prompt encodes persona + RAG passages + module context,
     // so any of those changing busts the cache automatically. We never
     // cache responses that came back with tool_calls — those depend on
     // dynamic tool results.
-    const cacheOn = cfg.storage?.cacheEnabled !== false;
-    const provider = cfg.llm.provider;
-    const modelName = (cfg.llm as any).model ?? '';
     if (cacheOn) {
       try {
         const hit = await db.cacheGet(provider, modelName, convo, system);
@@ -1239,6 +1323,13 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
           maybeAutoSpeak(bubble);
           state.history.push({ role: 'assistant', content: hit.response });
           await persistAndRefresh(q, hit.response);
+          await pluginHost.runAfterResponse({
+            sessionId: state.sessionId,
+            question: q,
+            responseText: hit.response,
+            elapsedMs: Date.now() - startedAt,
+            fromCache: true
+          });
           state.busy = false;
           return;
         }
@@ -1258,10 +1349,22 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
         messagesBox.scrollTop = messagesBox.scrollHeight;
       };
       const toolSchemas = tools.schemas();
-      const res = await sendChat(cfg.llm, convo, {
+      let res = await sendChat(cfg.llm, convo, {
         onDelta,
+        user: state.sessionId,
         ...(toolSchemas.length ? { tools: toolSchemas } : {})
       });
+      // Small local models (e.g. gemma) intermittently return an EMPTY
+      // completion. One retry almost always succeeds — cheap insurance so a
+      // free local model is as reliable as a hosted one. (Skip if the model
+      // asked for a tool — that path produces the answer on its second turn.)
+      if (!res.toolCalls?.length && !res.text.trim()) {
+        res = await sendChat(cfg.llm, convo, {
+          onDelta,
+          user: state.sessionId,
+          ...(toolSchemas.length ? { tools: toolSchemas } : {})
+        });
+      }
       if (!bubble) thinking.remove();
 
       // Native tool calls?
@@ -1315,7 +1418,7 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
           messagesBox.scrollTop = messagesBox.scrollHeight;
         };
         const convo2: ChatMessage[] = [{ role: 'system', content: system }, ...state.history];
-        const res2 = await sendChat(cfg.llm, convo2, { onDelta: onDelta2 });
+        const res2 = await sendChat(cfg.llm, convo2, { onDelta: onDelta2, user: state.sessionId });
         if (!holder.node) holder.node = appendMsg('assistant', res2.text);
         else updateAssistantRaw(holder.node, res2.text);
         finalizeStreamingBubble(holder.node);
@@ -1323,6 +1426,16 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
         maybeAutoSpeak(holder.node);
         state.history.push({ role: 'assistant', content: res2.text });
         await persistAndRefresh(q, res2.text);
+        await pluginHost.runAfterResponse({
+          sessionId: state.sessionId,
+          question: q,
+          responseText: res2.text,
+          elapsedMs: Date.now() - startedAt,
+          fromCache: false,
+          toolCalls: res.toolCalls?.map((tc) => ({
+            name: tc.function.name, args: {}, result: '', ms: 0
+          }))
+        });
       } else {
         const finalBubble: HTMLElement = bubble
           ? (setMsgContent(bubble, res.text, 'assistant'), updateAssistantRaw(bubble, res.text), bubble)
@@ -1339,6 +1452,13 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
           catch { /* non-fatal */ }
         }
         await persistAndRefresh(q, res.text);
+        await pluginHost.runAfterResponse({
+          sessionId: state.sessionId,
+          question: q,
+          responseText: res.text,
+          elapsedMs: Date.now() - startedAt,
+          fromCache: false
+        });
       }
     } catch (e: any) {
       thinking.remove();

@@ -143,6 +143,15 @@ hosting. The OpenAI-compatible adapter is what you use when, say, you
 want to call Gemini via its OpenAI-compatible URL
 (`https://generativelanguage.googleapis.com/v1beta/openai/`).
 
+**Ollama Cloud (Turbo)** — for hosted models like `gpt-oss:120b`,
+`deepseek-v3.1`, `qwen3:480b`. Three integration paths: transparent
+local-daemon proxy (sign in once with `ollama signin`, no client config
+change); direct Ollama provider pointed at `https://ollama.com`; or
+server-side OpenAI-compatible proxy with `OPENAI_BASE_URL=https://ollama.com/v1`.
+See `docs/ollama-cloud.md` for the full walkthrough, key-safety
+trade-offs per path, and a mixed-mode recipe that routes some models
+to OpenAI and others to Ollama Cloud from the same proxy.
+
 **Tool-call round-trip is fully wired.** When the model emits
 `tool_calls` over SSE, Acolyte accumulates them, runs the tool,
 re-injects the result with the correct `tool_call_id` + `name`, and
@@ -398,6 +407,33 @@ without code:
 
 Everything respects the manifest's `locked` list — locked fields
 render disabled.
+
+---
+
+## Branded topbar
+
+When the panel goes fullscreen on mobile, the visitor loses the host
+site's chrome — including whatever logo/wordmark was in the page
+header. `ui.topbar` injects an optional brand strip at the top of the
+chat panel so they stay anchored:
+
+```jsonc
+{
+  "ui": {
+    "topbar": {
+      "label": "● Brand  ·  Assistant",
+      "visibility": "mobile",      // 'mobile' (default) | 'always' | 'never'
+      "bg": "#fbf3e5",
+      "color": "#a8623a"
+    }
+  }
+}
+```
+
+Or use `html` for a logo + multi-color layout. See `docs/config.md`
+§ "Branded topbar" for the full surface (HTML form, CSS classes, safe-area
+behavior, why this is a config option rather than expected styling on
+`.acolyte-header`).
 
 ---
 
