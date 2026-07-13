@@ -56,6 +56,20 @@ export const TOOL_SCHEMAS: Record<string, ToolDescriptor> = {
         required: ['question']
       }
     }
+  },
+  catalog_lookup: {
+    type: 'function',
+    function: {
+      name: 'catalog_lookup',
+      description: 'Search the site\'s product catalog knowledge graph for PRECISE, COMPLETE answers about which items (packs) exist, what each one does/computes/models, and how they combine. Use this whenever the visitor asks about a specific capability ("which pack computes X"), a use-case ("what would I need for a shipping business"), or combining items — it returns exact matches and their relationships, unlike the page context.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'What to look for — a capability, metric, entity, domain, region, use-case, or item name.' }
+        },
+        required: ['query']
+      }
+    }
   }
 };
 
@@ -68,6 +82,7 @@ export class Tools {
     if (this.cfg.geminiResearch?.apiKey) out.push('gemini_research');
     if (this.cfg.context7?.enabled !== false) out.push('lookup_docs');
     if (this.cfg.deepAnalysis?.apiKey) out.push('deep_analysis');
+    if (this.cfg.catalogLookup?.dataUrl) out.push('catalog_lookup');
     return out;
   }
 
@@ -80,8 +95,68 @@ export class Tools {
       case 'gemini_research': return this.geminiResearch(String(args.topic ?? ''));
       case 'lookup_docs':     return this.lookupDocs(String(args.library ?? ''), String(args.topic ?? ''));
       case 'deep_analysis':   return this.deepAnalysis(String(args.question ?? ''), String(args.context ?? ''));
+      case 'catalog_lookup':  return this.catalogLookup(String(args.query ?? ''));
       default: return `Unknown tool: ${name}`;
     }
+  }
+
+  /** Client-side knowledge-graph lookup over a static {nodes,edges} JSON.
+   *  Scores nodes against the query, then for the matched items returns their
+   *  1-hop neighbourhood (what they compute/model + how they combine). No
+   *  backend — the graph is fetched once from `catalogLookup.dataUrl`. */
+  private _graph: { nodes: any[]; edges: any[] } | null = null;
+  private async loadGraph(): Promise<{ nodes: any[]; edges: any[] } | null> {
+    if (this._graph) return this._graph;
+    const url = this.cfg.catalogLookup?.dataUrl;
+    if (!url) return null;
+    try {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`graph ${r.status}`);
+      const g = await r.json() as any;
+      this._graph = { nodes: g.nodes ?? [], edges: g.edges ?? [] };
+      return this._graph;
+    } catch { return null; }
+  }
+
+  async catalogLookup(query: string): Promise<string> {
+    const g = await this.loadGraph();
+    if (!g) return 'Catalog graph is unavailable.';
+    const label = this.cfg.catalogLookup?.label ?? 'item';
+    const terms = query.toLowerCase().split(/[^a-z0-9]+/).filter((t) => t.length > 2);
+    if (!terms.length) return `Ask about a specific ${label}, capability, metric, or use-case.`;
+
+    const byId = new Map<string, any>(g.nodes.map((n) => [n.id, n]));
+    const packs = g.nodes.filter((n) => n.type === 'pack');
+    const hay = (n: any) => [
+      n.label, n.description, n.domain, n.region,
+      (n.capabilities ?? []).join(' '), (n.computes ?? []).join(' '),
+      (n.metrics ?? []).map((m: any) => `${m.tool} ${m.does}`).join(' '), (n.tags ?? []).join(' ')
+    ].join(' ').toLowerCase();
+
+    // score packs directly …
+    const score = (n: any) => { const h = hay(n); return terms.reduce((s, t) => s + (h.includes(t) ? 1 : 0), 0); };
+    const scored = packs.map((p) => ({ p, s: score(p) })).filter((x) => x.s > 0);
+
+    // … plus packs linked to any matched facet node (capability/entity/domain/region)
+    const facet = g.nodes.filter((n) => n.type !== 'pack' && terms.some((t) => (n.label ?? '').toLowerCase().includes(t)));
+    const facetPackIds = new Set<string>();
+    for (const f of facet) for (const e of g.edges) if (e.to === f.id) facetPackIds.add(e.from);
+    for (const id of facetPackIds) { const p = byId.get(id); if (p && !scored.find((x) => x.p.id === id)) scored.push({ p, s: 1 }); }
+
+    if (!scored.length) return `No ${label} in the catalog matches "${query}". There are ${packs.length} ${label}s total; suggest contacting the team for a custom build.`;
+
+    scored.sort((a, b) => b.s - a.s);
+    const top = scored.slice(0, 8);
+    const lines = top.map(({ p }) => {
+      const combines = g.edges.filter((e) => e.from === p.id && e.rel === 'combinesWith').map((e) => byId.get(e.to)?.label).filter(Boolean);
+      const metrics = (p.metrics ?? []).slice(0, 6).map((m: any) => m.tool).join(', ');
+      const computes = (p.computes ?? []).slice(0, 8).join('; ');
+      return `• ${p.label} [${p.region}] — ${p.description}` +
+        (computes ? `\n    Computes: ${computes}` : '') +
+        (metrics ? `\n    Queryable: ${metrics}` : '') +
+        (combines.length ? `\n    Combines with: ${combines.join(', ')}` : '');
+    });
+    return `Matched ${top.length} of ${packs.length} ${label}s for "${query}":\n${lines.join('\n')}`;
   }
 
   async geminiResearch(topic: string): Promise<string> {
