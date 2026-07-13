@@ -197,7 +197,13 @@ const formatting_terse: PromptBlock = {
   id: 'formatting_terse',
   render: () => `
 
-Format code blocks with triple backticks and the language name. Use short paragraphs, bullets sparingly, and tables only when comparing multiple things. Be terse — quality over volume.`
+OUTPUT LENGTH (obey strictly — you answer inside a website sidebar, not a document):
+- Lead with the direct answer in the FIRST sentence. No preamble, no "Great question!", no restating the question.
+- Default to about 9–12 sentences (~90–180 words). Hard ceiling ~270 words — if you're past it, wrap up, don't keep going.
+- Progressive disclosure: give a substantive answer, then OFFER a next step ("Want the pricing breakdown?") rather than exhausting every detail up front. Let the visitor pull more.
+- Use a short bullet list for 3+ parallel items and a table only to compare across axes; otherwise prefer prose.
+- Code blocks: triple backticks + language, minimal snippet only.
+- Substantial but focused — warm and human, never padded. Give a real answer, not a book.`
 };
 
 /* ───── Registry ───── */
@@ -231,6 +237,9 @@ export function defaultBlocksFor(p: CustomPersona): string[] {
   if (p.speakStyle === 'commentary')   out.push('speak_commentary');
   else if (p.speakStyle === 'verbatim')out.push('speak_verbatim');
   // 'off' → no SPEAK block
-  out.push('formatting');
+  // Personas without explicit promptBlocks (business, docs, bare) are the
+  // concise ones — the verbose teaching `formatting` block is opt-in (teacher
+  // lists it explicitly). Default to terse so a website helper stays short.
+  out.push('formatting_terse');
   return out;
 }
