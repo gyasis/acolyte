@@ -142,6 +142,14 @@ export interface ToolsConfig {
   context7?: { enabled?: boolean };
   /** Deep Gemini analysis. */
   deepAnalysis?: { apiKey?: string; model?: string };
+  /**
+   * Catalog knowledge-graph lookup. Point `dataUrl` at a static JSON graph
+   * ({nodes:[{id,type,label,...}], edges:[{from,rel,to}]}) served same-origin;
+   * the model can then call the `catalog_lookup` tool to answer precise
+   * "which item does X / how do they combine" questions fully client-side —
+   * no backend. `label` names the catalog in the tool description (e.g. "pack").
+   */
+  catalogLookup?: { dataUrl: string; label?: string };
   /** Verbose tool drill-downs (auto-expand). */
   verbose?: boolean;
 }
