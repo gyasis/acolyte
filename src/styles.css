@@ -561,13 +561,18 @@
 
 .acolyte-recent-strip {
   display: flex;
+  flex-wrap: wrap;              /* pills wrap into a multi-line grid, not a
+                                  single horizontally-scrolling row */
+  align-content: flex-start;
   gap: 6px;
-  padding: 6px 12px 0;
+  padding: 8px 12px;
   background: #fff;
   border-top: 1px solid #f0f0f0;
-  overflow-x: auto;
-  scrollbar-width: thin;
+  max-height: 104px;           /* ~3 rows of pills; scroll vertically beyond */
+  overflow-y: auto;
+  scrollbar-width: none;       /* match the panel's hidden-scrollbar treatment */
 }
+.acolyte-recent-strip::-webkit-scrollbar { width: 0; height: 0; display: none; }
 .acolyte-recent-strip:empty { display: none; }
 .ars-label {
   font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
