@@ -124,6 +124,17 @@ export interface RAGConfig {
    */
   showSourceCards?: boolean;
   /**
+   * How the sources footer renders — the "strategy for driving sources":
+   *   'cards'  — numbered jump-cards with snippet (default)
+   *   'list'   — full-width title+origin buttons
+   *   'pills'  — compact chip/pill row
+   *   'inline' — numbered [1][2] citation buttons with hover title
+   * All render each source as a clickable button that navigates to its page.
+   */
+  sourcesStyle?: 'cards' | 'list' | 'pills' | 'inline';
+  /** Auto-expand the sources footer instead of collapsing it. Default false. */
+  sourcesAutoOpen?: boolean;
+  /**
    * Whether to include passages from OTHER pages of the same site in the
    * retrieval (via the crossPageRAG plugin). For learning / docs sites
    * this is useful — for business / customer-facing chat where you don't

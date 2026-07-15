@@ -699,47 +699,69 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
 
   /* ───── Sources footer ───── */
 
+  /** Per-hit metadata shared by every sources strategy. */
+  function srcMeta(h: { passage: any }) {
+    const url = (h.passage as any).pageUrl as string | undefined;
+    const isCrossPage = !!url && !url.startsWith('#') && !sameDoc(url);
+    return { url, isCrossPage, origin: isCrossPage ? prettyOrigin(url!) : null, title: (h.passage.sectionTitle ?? '') as string };
+  }
+
   function appendSourcesFooter(bubble: HTMLElement, hits: { score: number; passage: any }[]): void {
     if (!bubble || !hits?.length) return;
-    const verbose = !!cfg.tools?.verbose;
-    const wrap = el('div', { class: 'acolyte-sources' + (verbose ? ' expanded' : '') });
+    const style = cfg.rag?.sourcesStyle ?? 'cards';
+    const autoOpen = cfg.rag?.sourcesAutoOpen ?? !!cfg.tools?.verbose;
+
+    // pills + inline are flat, always-visible rows (no collapse toggle).
+    if (style === 'pills' || style === 'inline') {
+      const wrap = el('div', { class: `acolyte-sources style-${style} expanded` });
+      wrap.appendChild(el('span', { class: 'src-tag' }, ['📚 sources']));
+      hits.forEach((h, i) => {
+        const m = srcMeta(h);
+        if (style === 'pills') {
+          wrap.appendChild(el('button', { class: 'src-pill', title: m.title, onclick: () => jumpToSource(h) },
+            [el('span', { class: 'src-pill-label' }, [m.origin || m.title || `Source ${i + 1}`]), el('span', { class: 'src-go' }, ['↗'])]));
+        } else {
+          wrap.appendChild(el('button', { class: 'src-cite', title: `${m.title}${m.origin ? ' · ' + m.origin : ''}`, onclick: () => jumpToSource(h) }, [String(i + 1)]));
+        }
+      });
+      bubble.appendChild(wrap);
+      return;
+    }
+
+    // list + cards use a collapsible wrap (auto-expanded when autoOpen).
+    const wrap = el('div', { class: `acolyte-sources style-${style}` + (autoOpen ? ' expanded' : '') });
     const summary = hits.slice(0, 3).map(h => (h.passage.sectionTitle || '').slice(0, 24)).join(' · ');
-    const head = el('button', {
-      class: 'src-head',
-      onclick: () => wrap.classList.toggle('expanded')
-    }, [
+    const head = el('button', { class: 'src-head', onclick: () => wrap.classList.toggle('expanded') }, [
       el('span', { class: 'src-arrow' }, ['▸']),
       el('span', { class: 'src-tag' }, ['📚 sources']),
-      el('span', { class: 'src-count' }, [`${hits.length} passages`]),
+      el('span', { class: 'src-count' }, [`${hits.length}`]),
       el('span', { class: 'src-summary' }, [summary + (hits.length > 3 ? ' · …' : '')])
     ]);
     const body = el('div', { class: 'src-body' });
     hits.forEach((h, i) => {
-      const url = (h.passage as any).pageUrl as string | undefined;
-      const isCrossPage = !!url && !url.startsWith('#') && !sameDoc(url);
-      const originLabel = isCrossPage ? prettyOrigin(url!) : null;
-      const card = el('button', {
-        class: 'src-card' + (isCrossPage ? ' cross-page' : ''),
-        title: isCrossPage
-          ? `Open ${originLabel} → ${h.passage.sectionTitle ?? ''}`
-          : 'Jump to ' + (h.passage.sectionTitle ?? ''),
-        onclick: () => jumpToSource(h)
-      }, [
-        el('div', { class: 'src-card-head' }, [
-          el('span', { class: 'src-num' }, [String(i + 1)]),
-          el('span', { class: 'src-title' }, [h.passage.sectionTitle ?? '']),
-          el('span', { class: 'src-score' }, [`score ${h.score.toFixed(2)}`]),
-          el('span', { class: 'src-jump' }, [isCrossPage ? '↗' : '↗'])
-        ]),
-        ...(isCrossPage ? [el('div', { class: 'src-origin' }, [
-          el('span', { class: 'src-origin-icon' }, ['📄']),
-          el('span', null, [originLabel ?? ''])
-        ])] : []),
-        el('div', { class: 'src-text' }, [
-          (h.passage.text ?? '').slice(0, 320) + ((h.passage.text ?? '').length > 320 ? '…' : '')
-        ])
-      ]);
-      body.appendChild(card);
+      const m = srcMeta(h);
+      if (style === 'list') {
+        body.appendChild(el('button', { class: 'src-listbtn', title: m.title, onclick: () => jumpToSource(h) }, [
+          el('span', { class: 'src-lb-title' }, [m.title || `Source ${i + 1}`]),
+          ...(m.origin ? [el('span', { class: 'src-lb-origin' }, [m.origin])] : []),
+          el('span', { class: 'src-go' }, ['↗'])
+        ]));
+      } else {
+        body.appendChild(el('button', {
+          class: 'src-card' + (m.isCrossPage ? ' cross-page' : ''),
+          title: m.isCrossPage ? `Open ${m.origin} → ${m.title}` : 'Jump to ' + m.title,
+          onclick: () => jumpToSource(h)
+        }, [
+          el('div', { class: 'src-card-head' }, [
+            el('span', { class: 'src-num' }, [String(i + 1)]),
+            el('span', { class: 'src-title' }, [m.title]),
+            el('span', { class: 'src-score' }, [`score ${h.score.toFixed(2)}`]),
+            el('span', { class: 'src-jump' }, ['↗'])
+          ]),
+          ...(m.isCrossPage ? [el('div', { class: 'src-origin' }, [el('span', { class: 'src-origin-icon' }, ['📄']), el('span', null, [m.origin ?? ''])])] : []),
+          el('div', { class: 'src-text' }, [(h.passage.text ?? '').slice(0, 320) + ((h.passage.text ?? '').length > 320 ? '…' : '')])
+        ]));
+      }
     });
     wrap.append(head, body);
     bubble.appendChild(wrap);
