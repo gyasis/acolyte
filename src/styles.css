@@ -492,6 +492,47 @@
 .src-jump { margin-left: auto; color: #888; }
 .src-card:hover .src-jump { color: var(--acolyte-accent, #2D8B55); }
 .src-text { font-size: 11px; color: #555; margin-top: 4px; line-height: 1.45; }
+
+/* ───── Sources strategies (cfg.rag.sourcesStyle) — 'cards' uses the rules above ───── */
+/* list: full-width title + origin buttons */
+.src-listbtn {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  background: #fff; border: 1px solid #cfcfcf; border-radius: 10px;
+  padding: 9px 11px; margin: 6px 0; cursor: pointer;
+  font-family: inherit; color: inherit; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  transition: background .12s, border-color .12s, transform .12s;
+}
+.src-listbtn:hover { border-color: var(--acolyte-accent, #2D8B55); background: color-mix(in srgb, var(--acolyte-accent, #2D8B55) 5%, #fff); transform: translateX(2px); }
+.src-lb-title { flex: 1; font-size: 12.5px; font-weight: 600; line-height: 1.3; }
+.src-lb-origin { font-family: ui-monospace, monospace; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #888; background: #fafafa; border: 1px solid #e5e5e5; border-radius: 5px; padding: 2px 6px; white-space: nowrap; }
+.src-listbtn .src-go { color: var(--acolyte-accent, #2D8B55); font-size: 15px; font-weight: 700; }
+
+/* pills + inline: flat, frameless, always-visible rows */
+.acolyte-sources.style-pills, .acolyte-sources.style-inline {
+  border: 0; background: transparent; border-radius: 0; margin-top: 8px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 0;
+}
+.acolyte-sources.style-pills .src-tag, .acolyte-sources.style-inline .src-tag { background: transparent; color: #888; padding: 0; border: 0; }
+.src-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: color-mix(in srgb, var(--acolyte-accent, #2D8B55) 8%, #fff);
+  border: 1px solid color-mix(in srgb, var(--acolyte-accent, #2D8B55) 30%, transparent);
+  color: var(--acolyte-accent, #2D8B55); border-radius: 9999px;
+  padding: 5px 11px; font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.src-pill:hover { background: var(--acolyte-accent, #2D8B55); color: #fff; border-color: var(--acolyte-accent, #2D8B55); }
+.src-pill .src-go { font-size: 12px; }
+/* inline: numbered citation buttons */
+.src-cite {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px;
+  background: color-mix(in srgb, var(--acolyte-accent, #2D8B55) 10%, #fff);
+  border: 1px solid color-mix(in srgb, var(--acolyte-accent, #2D8B55) 35%, transparent);
+  color: var(--acolyte-accent, #2D8B55); border-radius: 6px;
+  font-family: ui-monospace, monospace; font-size: 11px; font-weight: 700; cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+}
+.src-cite:hover { background: var(--acolyte-accent, #2D8B55); color: #fff; border-color: var(--acolyte-accent, #2D8B55); }
 .acolyte-src-flash {
   animation: acolyte-src-flash 1.6s ease-out;
 }
