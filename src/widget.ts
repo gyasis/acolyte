@@ -449,8 +449,9 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
     const body = el('div', { class: 'acolyte-msg-body' }) as HTMLElement;
     m.appendChild(body);
     setMsgContent(m, content, role);
-    if (role === 'assistant' && tts.supported) {
+    if (role === 'assistant' && tts.supported && cfg.voice?.enabled !== false) {
       // Per-message 🔊 button — speaks the SPEAK block (or a stripped fallback).
+      // Hidden when voice.enabled is false (turns the audio/speak feature off).
       const speakBtn = el('button', {
         class: 'acolyte-msg-speak',
         title: 'Speak this',
