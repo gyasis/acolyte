@@ -1525,7 +1525,7 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
       cfg = { ...cfg, ...patch };
       if (patch.voice) tts.update(patch.voice);
       if (patch.tools) tools.update(patch.tools);
-      if (patch.rag)   { rag.rebuild(); }
+      if (patch.rag)   { rag.update(patch.rag); }
       probe();
     },
     unmount: () => {

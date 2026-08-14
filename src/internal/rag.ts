@@ -196,5 +196,23 @@ export class RAGEngine {
   }
 
   /** Force a rebuild on next retrieve (e.g. after content changed). */
-  rebuild(): void { this.passages = null; this.df = {}; }
+  rebuild(): void { this.passages = null; this.df = {}; this.avgLen = 0; }
+
+  /**
+   * Re-target the engine at a different corpus, then rebuild.
+   *
+   * Without this, `handle.configure({ rag })` cleared the index and then
+   * re-fetched the ORIGINAL `sourceUrl` — the engine held the config object it
+   * was constructed with, so a scope change silently reloaded the old corpus.
+   * Hosts that switch corpus at runtime (a scope selector: "this page" vs "this
+   * subject" vs "everything") need the swap to actually take effect.
+   */
+  update(patch: RAGConfig): void {
+    this.cfg = { ...this.cfg, ...patch };
+    // An explicit corpus source wins over a stale one from the previous scope,
+    // otherwise `sections` would keep shadowing a newly-set `sourceUrl`.
+    if (patch.sections && !('sourceUrl' in patch)) delete (this.cfg as RAGConfig).sourceUrl;
+    if (patch.sourceUrl && !('sections' in patch)) delete (this.cfg as RAGConfig).sections;
+    this.rebuild();
+  }
 }
