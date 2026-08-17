@@ -378,10 +378,24 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
       if (topbarCfg.color) topbarEl.style.color = topbarCfg.color;
     }
 
-    panel = el('aside', { class: 'acolyte-panel', id: 'acolyte-panel' },
+    const inline = cfg.ui?.layout === 'inline';
+    panel = el('aside', {
+      class: 'acolyte-panel' + (inline ? ' acolyte-inline' : ''), id: 'acolyte-panel'
+    },
       [topbarEl, resizeHandle, header, settingsEl, historyPanelEl,
        messagesBox, recentStripEl, inputRow].filter(Boolean) as HTMLElement[]
     );
+
+    // Theme tokens straight onto the panel. Accept 'accent', '--acolyte-accent'
+    // and '--a-accent' alike so callers don't have to know the internal prefix.
+    if (cfg.ui?.theme) {
+      for (const [k, v] of Object.entries(cfg.ui.theme)) {
+        if (v == null) continue;
+        const name = k.startsWith('--') ? k : `--acolyte-${k}`;
+        panel.style.setProperty(name, String(v));
+      }
+    }
+    if (cfg.ui?.contentWidth) panel.style.setProperty('--acolyte-content-width', cfg.ui.contentWidth);
 
     // Hook up the drag-resize handle to let the user fine-tune width.
     wireResizeHandle(resizeHandle, panel);
@@ -401,7 +415,9 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
     }
 
     const target = document.querySelector(cfg.ui?.targetSelector ?? 'body') ?? document.body;
-    target.appendChild(fab);
+    // Inline mode has nothing to summon — the panel IS the page, so a floating
+    // action button is dead chrome. Escape must not close it either (below).
+    if (!inline) target.appendChild(fab);
     target.appendChild(panel);
 
     // keyboard shortcut
@@ -412,8 +428,11 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
       if (wantsMod && isMod && e.key.toLowerCase() === sc.slice(-1)) {
         e.preventDefault(); toggle(!state.open);
       }
-      if (e.key === 'Escape' && state.open) toggle(false);
+      if (e.key === 'Escape' && state.open && !inline) toggle(false);
     });
+
+    // Inline panels open immediately — there is no FAB to open them with.
+    if (inline) toggle(true);
   }
 
   function toggle(open?: boolean): void {
@@ -435,8 +454,13 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
   }
 
   function renderWelcome(): void {
+    // Idempotent: toggle(true) calls this on every open, and an inline panel
+    // opens itself at mount, so a host that also calls handle.open() used to
+    // get the greeting twice. Anything already in the box means we're done.
+    if (messagesBox.childElementCount > 0) return;
     const persona = resolvePersona(cfg.persona);
     const greeting = persona.greeting ?? 'Hi — ask me anything.';
+    if (!greeting) return;              // '' opts out — host renders its own empty state
     appendMsg('assistant', greeting);
   }
 

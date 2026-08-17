@@ -182,6 +182,38 @@ export interface UIConfig {
   targetSelector?: string;
   /** Initial panel width. */
   defaultWidth?: 'narrow' | 'wide' | 'full';
+  /**
+   * How the panel occupies the page.
+   *
+   * 'overlay' (default) — a fixed drawer floating above the host page. Correct
+   *   when Acolyte is a companion to someone else's content.
+   * 'inline' — the panel is a normal flow/flex child of `targetSelector`, with
+   *   no fixed positioning, no viewport pinning, no drop shadow and no FAB.
+   *   Use when Acolyte IS the page (a dedicated chat screen). Without this a
+   *   host has to undo `position: fixed` with `!important` overrides, which
+   *   breaks every time the widget's own layout changes.
+   */
+  layout?: 'overlay' | 'inline';
+  /**
+   * Theme tokens, applied as CSS custom properties on the panel.
+   *
+   * Keys may be given with or without the `--acolyte-` prefix — `accent`,
+   * `--acolyte-accent` and `--a-accent` all reach the same variable. Everything
+   * the stylesheet paints is tokenised (see styles.css), so a host can reskin
+   * the widget completely from config:
+   *
+   *   theme: { bg: '#faf8f5', fg: '#1a1a1a', accent: '#1e3a5f',
+   *            border: '#e5e0d8', radius: '10px', font: "'Inter', sans-serif" }
+   *
+   * Prefer this over host CSS overrides: it survives internal class renames.
+   */
+  theme?: Record<string, string>;
+  /**
+   * Max width of the message column and composer, e.g. '760px'. Long lines are
+   * hard to read edge-to-edge, which only shows up once the panel goes full
+   * width. Ignored when unset.
+   */
+  contentWidth?: string;
   /** Whether to inject the bundled stylesheet at mount time. Default true. */
   autoInjectCss?: boolean;
   /**
