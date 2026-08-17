@@ -726,8 +726,31 @@
 .acolyte-msg {
   max-width: 92%; padding: 10px 14px;
   border-radius: var(--a-radius-lg); font-size: var(--a-font-size); line-height: 1.5;
-  white-space: pre-wrap; word-break: break-word;
+  /* overflow-wrap, NOT word-break. `word-break: break-word` splits inside a word
+     whenever the line is tight, which in a narrow markdown table turns "essere"
+     into "esser/e". overflow-wrap only breaks a word that cannot fit on a line
+     of its own — long URLs still wrap, real words stay whole. */
+  white-space: pre-wrap; overflow-wrap: break-word;
 }
+
+/* ───── Markdown tables ─────
+   Previously unstyled, so a model answering with a table got an unreadable grid
+   that squeezed its first column until the words broke. Tables now size to their
+   content and scroll on their own axis instead of crushing — the page never
+   scrolls sideways, and no cell breaks a word. */
+.acolyte-msg-body table {
+  display: block; width: max-content; max-width: 100%;
+  overflow-x: auto; border-collapse: collapse;
+  margin: 10px 0; font-size: 0.95em; white-space: normal;
+}
+.acolyte-msg-body th,
+.acolyte-msg-body td {
+  border: 1px solid var(--a-border); padding: 6px 10px;
+  text-align: left; vertical-align: top;
+  word-break: normal; overflow-wrap: normal;
+}
+.acolyte-msg-body th { background: var(--a-surface); font-weight: 700; }
+.acolyte-msg-body tbody tr:nth-child(even) { background: var(--a-surface-alt); }
 .acolyte-msg.user {
   align-self: flex-end; background: var(--a-msg-user-bg); color: var(--a-msg-user-fg);
   border-bottom-right-radius: 4px;
