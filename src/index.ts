@@ -251,7 +251,8 @@ export type {
   ToolsConfig,
   UIConfig,
   VoiceConfig,
-  StorageConfig
+  StorageConfig,
+  ConversationSummary
 } from './types.js';
 
 // Plugin API — types + built-in plugins
