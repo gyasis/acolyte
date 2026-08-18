@@ -381,4 +381,42 @@ export interface AcolyteHandle {
   configure(patch: Partial<AcolyteConfig>): void;
   /** Remove the widget from the DOM and clear listeners. */
   unmount(): void;
+  /**
+   * Conversation history.
+   *
+   * The widget already persists every exchange to IndexedDB and shows it in its
+   * own history panel — but a host embedding acolyte as a full page usually
+   * wants that list in ITS chrome (a sidebar, a thread rail) instead. Without
+   * this the only options were to reach into acolyte's private IndexedDB, or to
+   * keep a parallel store that drifts from the real conversation. Both are
+   * worse than exposing what already exists.
+   */
+  history: {
+    /** Newest first. Empty when storage.historyEnabled is false. */
+    list(limit?: number): Promise<ConversationSummary[]>;
+    /** Load a conversation back into the panel. */
+    open(id: number): Promise<void>;
+    /** Delete one conversation. */
+    remove(id: number): Promise<void>;
+    /** Start a fresh conversation, leaving the stored ones alone. */
+    start(): void;
+    /** id of the conversation being added to, or null before the first reply. */
+    currentId(): number | null;
+    /**
+     * Fires whenever the stored set changes — new conversation, a reply
+     * appended, a load, a delete. Returns an unsubscribe function. A host
+     * sidebar should re-render on this rather than poll.
+     */
+    onChange(cb: () => void): () => void;
+  };
+}
+
+/** One row in the history list. */
+export interface ConversationSummary {
+  id: number;
+  title: string;
+  updatedAt: number;
+  model?: string;
+  provider?: string;
+  messageCount?: number;
 }

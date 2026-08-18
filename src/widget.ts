@@ -961,12 +961,19 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
           class: 'ahp-del', title: 'Delete',
           onclick: (e: Event) => {
             e.stopPropagation();
-            db.deleteConversation(c.id).then(refreshHistoryPanel);
+            db.deleteConversation(c.id).then(refreshHistoryPanel).then(historyChanged);
           }
         }, ['×'])
       ]);
       listEl.appendChild(row);
     });
+  }
+
+  // Hosts that render their own thread list need to know when the stored set
+  // changed; polling IndexedDB from outside would be both wasteful and racy.
+  const historyWatchers = new Set<() => void>();
+  function historyChanged(): void {
+    for (const cb of historyWatchers) { try { cb(); } catch { /* a bad listener must not break the widget */ } }
   }
 
   async function loadConversation(id: number): Promise<void> {
@@ -982,6 +989,7 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
     state.historyPanelOpen = false;
     historyPanelEl.classList.remove('open');
     refreshRecentStrip();
+    historyChanged();
     note(`Loaded "${conv.title || 'conversation'}"`);
   }
 
@@ -1545,6 +1553,7 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
       }
       await db.appendMessage(state.convId, { role: 'user',      content: userMsg });
       await db.appendMessage(state.convId, { role: 'assistant', content: assistantMsg });
+      historyChanged();
       refreshRecentStrip();
     } catch { /* persistence is best-effort */ }
   }
@@ -1571,6 +1580,15 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
       pluginHost.runOnClose();
       fab.remove();
       panel.remove();
+    },
+    history: {
+      list: (limit = 50) =>
+        cfg.storage?.historyEnabled === false ? Promise.resolve([]) : db.listConversations(limit),
+      open: (id: number) => loadConversation(id),
+      remove: async (id: number) => { await db.deleteConversation(id); historyChanged(); },
+      start: () => { clearHistory(); historyChanged(); },
+      currentId: () => state.convId,
+      onChange: (cb: () => void) => { historyWatchers.add(cb); return () => historyWatchers.delete(cb); }
     }
   };
 
