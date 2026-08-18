@@ -131,9 +131,27 @@ export class RAGEngine {
     return out;
   }
 
+  /**
+   * Unicode-aware tokenizer with diacritic folding.
+   *
+   * The previous pattern was `[^a-z0-9_\-/.]` — ASCII only — which did not just
+   * drop accented characters, it SPLIT WORDS AT THEM:
+   *     farmacològico -> ["farmacol", "gico"]      anamnèsi -> ["anamn", "si"]
+   *     perché -> ["perch"]      più -> ["pi"]      è -> []  (dropped entirely)
+   * Every accented word became one or two tokens that match nothing, so for any
+   * corpus in Italian, French, Spanish, Portuguese, German, Turkish, Vietnamese
+   * — or any non-Latin script at all, which was erased wholesale — retrieval was
+   * silently degraded in proportion to how much of it was not English.
+   *
+   * NFD + stripping combining marks also FOLDS accents, so a query for "citta"
+   * finds "città" and vice versa. That matters because people type unaccented.
+   */
   private tokenize(s: string): string[] {
-    return s.toLowerCase()
-      .replace(/[^a-z0-9_\-/.]+/g, ' ')
+    return s
+      .normalize('NFD')
+      .replace(/\p{M}+/gu, '')            // é -> e, ò -> o, ü -> u
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}_\-/.]+/gu, ' ')
       .split(/\s+/)
       .filter(t => t.length > 1 && t.length < 40);
   }
