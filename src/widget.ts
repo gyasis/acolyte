@@ -772,7 +772,7 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
           el('span', { class: 'src-go' }, ['↗'])
         ]));
       } else {
-        body.appendChild(el('button', {
+        const card = el('button', {
           class: 'src-card' + (m.isCrossPage ? ' cross-page' : ''),
           title: m.isCrossPage ? `Open ${m.origin} → ${m.title}` : 'Jump to ' + m.title,
           onclick: () => jumpToSource(h)
@@ -785,7 +785,15 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
           ]),
           ...(m.isCrossPage ? [el('div', { class: 'src-origin' }, [el('span', { class: 'src-origin-icon' }, ['📄']), el('span', null, [m.origin ?? ''])])] : []),
           el('div', { class: 'src-text' }, [(h.passage.text ?? '').slice(0, 320) + ((h.passage.text ?? '').length > 320 ? '…' : '')])
-        ]));
+        ]) as HTMLElement;
+        // Expose the passage's provenance on the element. A host that wants to
+        // do more than jump — record which lesson was cited, build a flashcard
+        // from it, open it in a pane — should not have to re-run retrieval to
+        // find out where an answer came from.
+        card.dataset.acolyteSource = JSON.stringify({
+          id: h.passage.sectionId, title: m.title, score: h.score, meta: h.passage.meta ?? {}
+        });
+        body.appendChild(card);
       }
     });
     wrap.append(head, body);
@@ -799,19 +807,26 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
    *  outside the host's routed view — survives the page change with its history
    *  and any in-flight audio intact. With no host listener the event goes
    *  un-prevented and we hard-navigate, so standalone Acolyte is unchanged. */
-  function requestHostNav(url: string): boolean {
-    const ev = new CustomEvent('acolyte:navigate', { detail: { url }, cancelable: true });
+  function requestHostNav(url: string, meta?: Record<string, any>): boolean {
+    // `meta` rides along so a host can route intelligently (open in a pane,
+    // record which lesson/section was cited) instead of only seeing a URL.
+    const ev = new CustomEvent('acolyte:navigate', { detail: { url, meta }, cancelable: true });
     document.dispatchEvent(ev);
     return ev.defaultPrevented;
   }
 
   function jumpToSource(hit: { passage: any }): void {
-    const url = hit.passage.pageUrl as string | undefined;
+    // A corpus loaded from `sections`/`sourceUrl` describes documents that are
+    // NOT this page, so its own meta is the only thing that knows where a
+    // passage lives. Prefer it; fall back to the legacy field, then to an
+    // in-page anchor for DOM-scraped content.
+    const meta = hit.passage.meta ?? {};
+    const url = (meta.href ?? meta.pageUrl ?? hit.passage.pageUrl) as string | undefined;
     // Cross-page hit → navigate to that page (carries the anchor, if any).
     // Prefer a host SPA navigation so the widget (its panel, history, and
     // playing audio) persists across pages; hard-load only if unhandled.
     if (url && !sameDoc(url)) {
-      if (!requestHostNav(url)) window.location.href = url;
+      if (!requestHostNav(url, meta)) window.location.href = url;
       return;
     }
     const sid = hit.passage.sectionId;

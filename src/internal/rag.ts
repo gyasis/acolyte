@@ -18,6 +18,16 @@ interface Passage {
   text: string;
   terms: string[];
   len: number;
+  /**
+   * The source RAGContent's `meta`, carried through verbatim.
+   *
+   * It used to be dropped at indexing time, which quietly broke every citation
+   * for corpora loaded via `sections`/`sourceUrl`: jumpToSource() looks for a
+   * URL on the passage, found nothing, fell back to getElementById(sectionId),
+   * and — on a page that is not the document the passage came from — silently
+   * did nothing. Clicking a source did nothing at all.
+   */
+  meta?: Record<string, any>;
 }
 
 export class RAGEngine {
@@ -155,7 +165,7 @@ export class RAGEngine {
         const id = this.passages.length;
         this.passages.push({
           id, sectionId: s.id, sectionTitle: s.title,
-          text, terms, len: terms.length
+          text, terms, len: terms.length, meta: s.meta as Record<string, any> | undefined
         });
         totalLen += terms.length;
         const seen: Record<string, true> = {};
