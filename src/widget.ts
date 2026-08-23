@@ -414,6 +414,12 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
         if (v == null) continue;
         const name = k.startsWith('--') ? k : `--acolyte-${k}`;
         panel.style.setProperty(name, String(v));
+        // The FAB is a SIBLING of the panel, not a child, so panel-scoped
+        // custom properties never reached it: a themed widget still summoned
+        // itself with a default-accent button. That button is the only part
+        // visible while the panel is closed, so it is the part a mismatched
+        // theme shows up on first.
+        fab?.style.setProperty(name, String(v));
       }
     }
     if (cfg.ui?.contentWidth) panel.style.setProperty('--acolyte-content-width', cfg.ui.contentWidth);
