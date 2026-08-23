@@ -217,6 +217,13 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
               score: (s.meta as any).score as number,   // cosine, already ~[0,1]
               passage: {
                 sectionId: s.id, sectionTitle: s.title, text: s.text,
+                // Carry the section's own metadata through. The lexical path
+                // does this via RAGEngine.indexPassages; omitting it here meant
+                // every PRE-SCORED source lost its meta, so a host could style
+                // or route a citation from BM25 results but not from semantic
+                // ones — the same citation, silently poorer, depending only on
+                // which channel found it.
+                meta: s.meta,
                 sourceName: src.name, pageUrl: src.pageUrl?.(s)
               }
             });
