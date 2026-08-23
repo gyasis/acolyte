@@ -345,20 +345,17 @@
 
 /* ───── 🎤 Mic button ───── */
 .acolyte-mic {
-  flex-shrink: 0;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: var(--a-surface);
-  border: 1px solid var(--a-border-strong);
-  font-size: 18px;
+  /* Size and shape come from the shared .acolyte-mic/.acolyte-send rule in the
+     composer block — this only carries the mic's own look. It used to set a
+     40px bordered box, which is what made it the odd one out in the row. */
+  background: var(--a-surface-alt);
+  border: 0;
+  color: inherit;
+  font-size: 15px;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background .15s, border-color .15s, box-shadow .15s;
+  transition: background .15s, color .15s, box-shadow .15s;
 }
-.acolyte-mic:hover { border-color: var(--a-accent); }
+.acolyte-mic:hover { color: var(--a-accent); }
 .acolyte-mic.listening {
   background: var(--a-danger);
   border-color: var(--a-danger);
@@ -795,22 +792,59 @@
   color: inherit; white-space: pre;
 }
 
+/* ───── Composer ─────
+   ONE control, not three boxes. The row itself is the pill; the textarea goes
+   transparent inside it and the mic and send sit in it as equal squares.
+
+   The previous default left `align-items` at its initial value, so the row
+   STRETCHED its children: send grew to the textarea's height (61px measured)
+   while the mic stayed pinned at 40px, leaving the mic's bottom floating 21px
+   above its neighbours. Three different sizes, three separate borders, one row.
+   `flex-end` also keeps the buttons on the baseline as the textarea grows,
+   which stretch cannot do. */
 .acolyte-input-row {
-  display: flex; gap: 8px; padding: 12px 16px;
-  border-top: 1px solid var(--a-border); background: var(--a-bg);
+  display: flex; align-items: flex-end; gap: 8px;
+  width: calc(100% - 24px); margin: 0 auto 12px;
+  padding: 7px 8px 7px 14px;
+  border: 1px solid var(--a-border-strong); border-radius: 18px;
+  background: var(--a-bg);
+  transition: border-color .15s, box-shadow .15s;
+}
+/* The focus ring belongs to the whole control, not to the textarea inside it —
+   otherwise focus draws a second box within the first. */
+.acolyte-input-row:focus-within {
+  border-color: var(--a-accent);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--a-accent) 16%, transparent);
 }
 .acolyte-input {
-  flex: 1; resize: none; border: 1px solid var(--a-border-strong);
-  border-radius: 10px; padding: 10px 12px;
-  font-family: inherit; font-size: var(--a-font-size); line-height: 1.4;
-  background: var(--a-surface-alt); min-height: 40px; max-height: 140px;
+  flex: 1; order: 1; resize: none;
+  border: 0; background: none; box-shadow: none; border-radius: 0;
+  padding: 7px 0;
+  font-family: inherit; font-size: var(--a-font-size); line-height: 1.45;
+  color: inherit;
+  /* One line to start. The old 40px floor was sized for a bordered box of its
+     own; inside the pill it is dead space under the caret. */
+  min-height: 24px; max-height: 140px;
 }
-.acolyte-input:focus { outline: none; border-color: var(--a-accent); background: var(--a-bg); }
+.acolyte-input:focus { outline: none; border: 0; background: none; box-shadow: none; }
+/* Both buttons are the same square, grouped to the right of the field. `order`
+   does that without touching the DOM, so a host that reads the markup is
+   unaffected. */
+.acolyte-mic, .acolyte-send {
+  flex: 0 0 auto; order: 2;
+  width: 34px; height: 34px; padding: 0;
+  border-radius: 11px;
+  display: grid; place-items: center;
+}
 .acolyte-send {
+  order: 3;
   background: var(--a-accent); color: var(--a-accent-contrast);
-  border: 0; border-radius: 10px; padding: 0 16px;
-  font-weight: 600; cursor: pointer; font-size: 13px;
+  border: 0; cursor: pointer;
+  font-size: 0;                        /* the label is replaced by the glyph below */
 }
+.acolyte-send::after { content: '↑'; font-size: 16px; font-weight: 700; line-height: 1; }
+.acolyte-send:hover { filter: brightness(1.12); }
+.acolyte-send:disabled { opacity: .45; cursor: default; filter: none; }
 
 @media (max-width: 640px) {
   .acolyte-panel { width: 100vw; border-left: 0; }
