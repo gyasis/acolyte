@@ -348,11 +348,25 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
     }, ['🎤']);
     inputEl = el('textarea', {
       class: 'acolyte-input',
+      // A textarea defaults to rows=2, so the EMPTY composer stood two lines
+      // tall while the mic and send buttons sat on its bottom edge — the
+      // placeholder floated at the top of the pill with the icons far below it.
+      // One row makes the resting height match the buttons exactly.
+      rows: '1',
       placeholder: 'Ask anything… (Shift+Enter for newline)',
+      oninput: () => autogrow(),
       onkeydown: (e: KeyboardEvent) => {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(inputEl.value); }
       }
     }) as HTMLTextAreaElement;
+    // Grow with the text, shrink back when it is cleared. Without this, rows=1
+    // would trap a long message in a one-line scroll box; hosts had to
+    // reimplement it themselves.
+    const autogrow = () => {
+      inputEl.style.height = 'auto';
+      const max = parseFloat(getComputedStyle(inputEl).maxHeight) || 140;
+      inputEl.style.height = Math.min(inputEl.scrollHeight, max) + 'px';
+    };
     const sendBtn = el('button', { class: 'acolyte-send', onclick: () => send(inputEl.value) }, ['Send']);
     const inputRow = el('div', { class: 'acolyte-input-row' }, [micBtnEl, inputEl, sendBtn]);
 
@@ -1344,6 +1358,7 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
     if (!q || state.busy) return;
     tts.cancel();
     inputEl.value = '';
+    inputEl.style.height = '';        // back to one row; clearing does not fire `input`
     appendMsg('user', q);
     state.history.push({ role: 'user', content: q });
 
