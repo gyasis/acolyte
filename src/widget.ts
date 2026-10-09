@@ -36,6 +36,7 @@ import {
   listAvailableModels,
   providerLabel
 } from './internal/settings.js';
+import { dropLocked, isLocked } from './internal/manifest.js';
 import { PluginHost } from './plugin.js';
 import type { RAGContent } from './types.js';
 
@@ -95,9 +96,18 @@ function deepMergeCfg<T extends Record<string, any>>(base: T, patch: any): T {
 }
 
 export function createWidget(config: AcolyteConfig): AcolyteHandle {
-  // Layer stored user settings on top of caller-supplied config so the
-  // last-saved provider/model/voice/etc. survive page reloads.
-  let cfg: AcolyteConfig = deepMergeCfg(config, loadStoredSettings(config));
+  // Locked deployment (production): visitors get no settings/model UI and
+  // browser-stored overrides are neither read nor written. The deployer's
+  // config is the only source of truth. Opt in with
+  // `available.features.settingsPanel: false`.
+  const lockedDeployment = config.available?.features?.settingsPanel === false;
+  if (lockedDeployment) clearStoredSettings(config);   // purge stale overrides
+  // Otherwise layer stored user settings on top of caller-supplied config so
+  // the last-saved provider/model/voice/etc. survive page reloads. Values at
+  // deployer-`locked` paths are always dropped.
+  let cfg: AcolyteConfig = lockedDeployment
+    ? config
+    : deepMergeCfg(config, dropLocked(config, loadStoredSettings(config)));
   const db    = new ChatDB(cfg.storage?.dbName ?? 'acolyte-chat');
   const rag   = new RAGEngine(cfg.rag ?? {});
   const tts   = new TTSEngine(cfg.voice ?? {});
@@ -300,8 +310,8 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
   let messagesBox: HTMLElement;
   let inputEl: HTMLTextAreaElement;
   let statusEl: HTMLElement;
-  let modelPickerEl: HTMLSelectElement;
-  let settingsEl: HTMLElement;
+  let modelPickerEl: HTMLSelectElement | null = null;
+  let settingsEl: HTMLElement | null = null;
   let historyPanelEl: HTMLElement;
   let recentStripEl: HTMLElement;
   let micBtnEl: HTMLElement;
@@ -315,11 +325,13 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
     }, [cfg.ui?.fabIcon ?? '💬']);
 
     statusEl = el('span', { class: 'acolyte-status' }, ['…']);
-    modelPickerEl = el('select', {
-      class: 'acolyte-model-picker',
-      title: 'Switch model',
-      onchange: (e: Event) => onModelChange((e.target as HTMLSelectElement).value)
-    }, [el('option', { value: '' }, ['loading…'])]) as HTMLSelectElement;
+    if (!lockedDeployment) {
+      modelPickerEl = el('select', {
+        class: 'acolyte-model-picker',
+        title: 'Switch model',
+        onchange: (e: Event) => onModelChange((e.target as HTMLSelectElement).value)
+      }, [el('option', { value: '' }, ['loading…'])]) as HTMLSelectElement;
+    }
 
     // Slim header: brand icon + model picker (which doubles as status) +
     // new conversation + settings + close. History panel and width cycle
@@ -329,15 +341,15 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
     const brand = el('span', { class: 'acolyte-brand', title: 'Acolyte' }, [cfg.ui?.fabIcon ?? '💬']);
     const header = el('div', { class: 'acolyte-header' }, [
       brand,
-      modelPickerEl,
+      ...(modelPickerEl ? [modelPickerEl] : []),
       el('button', { class: 'acolyte-iconbtn', onclick: clearHistory, title: 'New conversation' }, ['+']),
-      el('button', { class: 'acolyte-iconbtn', onclick: toggleSettings, title: 'Settings (provider, model, voice, history, …)' }, ['⚙']),
+      ...(lockedDeployment ? [] : [el('button', { class: 'acolyte-iconbtn', onclick: toggleSettings, title: 'Settings (provider, model, voice, history, …)' }, ['⚙'])]),
       el('button', { class: 'acolyte-iconbtn', onclick: () => toggle(false), title: 'Close' }, ['×'])
     ]);
     // Status pill is kept in the DOM tree but tucked into the model picker
     // tooltip so we don't double-display the same info.
     statusEl.style.display = 'none';
-    settingsEl = buildSettingsPanel();
+    settingsEl = lockedDeployment ? null : buildSettingsPanel();
     historyPanelEl = buildHistoryPanel();
     messagesBox = el('div', { class: 'acolyte-messages' });
 
@@ -1055,43 +1067,47 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
   /* ───── Provider probe / status + inline model picker ───── */
 
   async function probe(): Promise<void> {
+    // Locked deployment: no picker to populate, no model-list fetch.
+    if (lockedDeployment || !modelPickerEl) return;
+    const picker = modelPickerEl;
     const llm = cfg.llm;
     const label = providerLabel(llm);
     try {
       const models = await listAvailableModels(llm);
       if (!(llm as any).model && models.length) (llm as any).model = models[0].name;
-      modelPickerEl.innerHTML = '';
+      picker.innerHTML = '';
       if (models.length) {
         for (const m of models) {
           const opt = document.createElement('option');
           opt.value = m.name; opt.textContent = m.name;
           if (m.name === (llm as any).model) opt.selected = true;
-          modelPickerEl.appendChild(opt);
+          picker.appendChild(opt);
         }
-        modelPickerEl.disabled = false;
-        modelPickerEl.title = `${label} · ${(llm as any).model ?? '?'} — click to switch`;
-        modelPickerEl.classList.remove('err');
+        picker.disabled = false;
+        picker.title = `${label} · ${(llm as any).model ?? '?'} — click to switch`;
+        picker.classList.remove('err');
       } else {
         const opt = document.createElement('option');
         opt.value = ''; opt.textContent = `${label} · unreachable`;
-        modelPickerEl.appendChild(opt);
-        modelPickerEl.disabled = true;
-        modelPickerEl.classList.add('err');
+        picker.appendChild(opt);
+        picker.disabled = true;
+        picker.classList.add('err');
       }
     } catch {
-      modelPickerEl.innerHTML = '';
+      picker.innerHTML = '';
       const opt = document.createElement('option');
       opt.value = ''; opt.textContent = `${label} · error`;
-      modelPickerEl.appendChild(opt);
-      modelPickerEl.classList.add('err');
+      picker.appendChild(opt);
+      picker.classList.add('err');
     }
   }
 
   function onModelChange(name: string): void {
-    if (!name) return;
+    if (lockedDeployment || !name) return;
+    if (isLocked(config, 'llm.model')) return;
     (cfg.llm as any).model = name;
     saveStoredSettings(config, { llm: { ...cfg.llm } } as Partial<AcolyteConfig>);
-    modelPickerEl.title = `${providerLabel(cfg.llm)} · ${name} — click to switch`;
+    if (modelPickerEl) modelPickerEl.title = `${providerLabel(cfg.llm)} · ${name} — click to switch`;
     note(`Switched to ${name}`);
   }
 
@@ -1108,6 +1124,7 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
   /* ───── Settings panel ───── */
 
   function toggleSettings(): void {
+    if (lockedDeployment || !settingsEl) return;
     settingsOpen = !settingsOpen;
     settingsEl.classList.toggle('open', settingsOpen);
     if (settingsOpen) refreshSettingsPanel();
@@ -1118,6 +1135,7 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
   }
 
   function refreshSettingsPanel(): void {
+    if (lockedDeployment || !settingsEl) return;
     settingsEl.innerHTML = '';
     const llm: any = cfg.llm;
     const v = cfg.voice ?? {};
@@ -1297,6 +1315,7 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
   }
 
   function applySettings(): void {
+    if (lockedDeployment) return;
     const get = (id: string) => document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
     const checked = (id: string) => (document.getElementById(id) as HTMLInputElement | null)?.checked ?? false;
 
@@ -1316,7 +1335,7 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
     else                       llm.baseUrl = baseurl || undefined;
     if (apikey) llm.apiKey = apikey;
 
-    const patch: Partial<AcolyteConfig> = {
+    const patch: Partial<AcolyteConfig> = dropLocked(config, {
       llm,
       persona,
       voice: { ...cfg.voice, accent, gender, rate, engine, autoSpeak: checked('as-voice-auto') },
@@ -1338,7 +1357,7 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
         historyEnabled: checked('as-history'),
         memoryEnabled:  checked('as-memory')
       }
-    };
+    } as Partial<AcolyteConfig>);
 
     cfg = deepMergeCfg(cfg, patch);
     saveStoredSettings(config, patch);
@@ -1349,6 +1368,7 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
   }
 
   function resetSettings(): void {
+    if (lockedDeployment) return;
     if (!confirm('Reset all settings to deployment defaults? This clears your saved preferences but does not delete conversation history.')) return;
     clearStoredSettings(config);
     cfg = JSON.parse(JSON.stringify(config));   // back to the original mount() config

@@ -81,7 +81,7 @@ available:
     tools:            true     # function calling
     history:          true     # IndexedDB persistence
     crossSessionMemory: true   # past-conversation memory
-    settingsPanel:    true     # let user override defaults in-browser
+    settingsPanel:    true     # false = LOCKED deployment: no settings/model UI, stored overrides ignored+purged
     skinSelector:     false    # don't expose theme swap to users
 
 # 3) What the widget USES at first run (overridable by user via settings UI)

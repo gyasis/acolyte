@@ -115,3 +115,19 @@ export function splitManifest(raw: Record<string, unknown>): AcolyteConfig {
 export function isLocked(cfg: AcolyteConfig, path: string): boolean {
   return Array.isArray(cfg.locked) && cfg.locked.indexOf(path) !== -1;
 }
+
+/**
+ * Returns a copy of `patch` with every value whose dotted path is locked in
+ * `cfg` removed (recursing into plain objects). Used to keep stored/user
+ * overrides from touching deployer-locked settings.
+ */
+export function dropLocked<T extends Record<string, any>>(cfg: AcolyteConfig, patch: T, prefix = ''): T {
+  const out: Record<string, any> = {};
+  for (const k of Object.keys(patch ?? {})) {
+    const path = prefix ? prefix + '.' + k : k;
+    if (isLocked(cfg, path)) continue;
+    const v = patch[k];
+    out[k] = (v && typeof v === 'object' && !Array.isArray(v)) ? dropLocked(cfg, v, path) : v;
+  }
+  return out as T;
+}
