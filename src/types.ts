@@ -327,6 +327,14 @@ export interface AcolyteManifest {
       tools?: boolean;
       history?: boolean;
       crossSessionMemory?: boolean;
+      /**
+       * Set to `false` for a LOCKED DEPLOYMENT (production). The widget then
+       * renders no gear button, settings panel or model picker, never reads
+       * or writes visitor-side stored settings (any saved in the browser are
+       * purged on load), and uses the deployer config verbatim. Omitted/true
+       * keeps the dev behaviour: full settings panel + model picker, with
+       * user overrides persisted in localStorage.
+       */
       settingsPanel?: boolean;
       skinSelector?: boolean;
     };
