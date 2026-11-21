@@ -771,7 +771,7 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
   }
 
   function appendSourcesFooter(bubble: HTMLElement, hits: { score: number; passage: any }[]): void {
-    if (!bubble || !hits?.length) return;
+    if (!bubble || !hits?.length || cfg.rag?.showSourceCards === false) return;
     const style = cfg.rag?.sourcesStyle ?? 'cards';
     const autoOpen = cfg.rag?.sourcesAutoOpen ?? !!cfg.tools?.verbose;
 
@@ -1466,7 +1466,8 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
         updateAssistantRaw(bubble, full);
         messagesBox.scrollTop = messagesBox.scrollHeight;
       };
-      const toolSchemas = tools.schemas();
+      const pluginTools = pluginHost.allTools();
+      const toolSchemas = [...tools.schemas(), ...pluginTools.map(t => t.schema)];
       let res = await sendChat(cfg.llm, convo, {
         onDelta,
         user: state.sessionId,
@@ -1508,7 +1509,8 @@ export function createWidget(config: AcolyteConfig): AcolyteHandle {
             } catch { /* fall through to live tool call */ }
           }
           if (!fromCache) {
-            try { result = await tools.run(fn.name, fn.arguments); }
+            const pluginTool = pluginTools.find(t => t.schema.function.name === fn.name);
+            try { result = pluginTool ? await pluginTool.run(fn.arguments) : await tools.run(fn.name, fn.arguments); }
             catch (e: any) { result = `Tool error: ${e.message}`; errored = true; }
             if (cacheOn && !errored) {
               try { await db.toolCachePut(fn.name, fn.arguments, result); }

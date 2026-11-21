@@ -242,8 +242,12 @@ async function openaiSend(
       if (!dl) continue;
       const j = dl.slice(5).trim();
       if (j === '[DONE]') continue;
+      let msg: any;
+      try { msg = JSON.parse(j); } catch { continue; /* skip malformed */ }
+      // A server-sent error chunk means the stream was cut short; surface it
+      // instead of returning the partial text as if it were a complete answer.
+      if (msg?.error) throw new Error(streamErrorText(msg.error));
       try {
-        const msg = JSON.parse(j);
         const delta = msg.choices?.[0]?.delta ?? {};
         if (typeof delta.content === 'string' && delta.content) {
           full += delta.content;
@@ -342,8 +346,12 @@ async function ollamaSend(
     for (const line of lines) {
       const t = line.trim();
       if (!t) continue;
+      let msg: any;
+      try { msg = JSON.parse(t); } catch { continue; /* skip malformed */ }
+      // A server-sent error line ends the stream; surface it instead of
+      // returning the partial text as if it were a complete answer.
+      if (typeof msg?.error === 'string') throw new Error(streamErrorText(msg.error));
       try {
-        const msg = JSON.parse(t);
         const delta = msg.message?.content ?? '';
         if (delta) {
           full += delta;
@@ -354,6 +362,12 @@ async function ollamaSend(
     }
   }
   return { text: full };
+}
+
+/** Message for a stream that ended with a server-sent error. */
+function streamErrorText(err: unknown): string {
+  const cause = typeof err === 'string' ? err : (err as { message?: string })?.message ?? JSON.stringify(err);
+  return `Answer interrupted: ${cause}`;
 }
 
 /* ───── Public dispatcher ───── */

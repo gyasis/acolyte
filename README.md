@@ -596,6 +596,7 @@ button. Full E2E protocol in `docs/testing.md`.
 | `docs/manifest.md`        | YAML manifest schema, `available`/`defaults`/`locked`        |
 | `docs/personas.md`        | Built-in + custom personas, all prompt blocks                 |
 | `docs/plugins.md`         | Plugin anatomy, hooks, capabilities, UI slots                 |
+| `docs/house-setup.md`     | How our apps connect: same-origin proxy, governor, PromptChain backend |
 | `docs/voice-follow.md`    | The `<ref>` mechanism, authoring for voice-pointed pages     |
 | `docs/security.md`        | Threat model, audit checklist, key handling                   |
 | `docs/testing.md`         | E2E test topology, two-command bring-up                      |
